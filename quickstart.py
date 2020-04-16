@@ -17,8 +17,8 @@ class GoogleCalendar:
     creds = None
     def __init__(self):
         if os.path.exists(self.tokenpath):
-            with open(self.tokenpath, 'rb') as token:
-                self.creds = pickle.load(token)
+            self.creds = self._load_token();
+        
         # If there are no (valid) credentials available, let the user log in.
         if not self.creds or not self.creds.valid:
             if self.creds and self.creds.expired and self.creds.refresh_token:
@@ -33,9 +33,12 @@ class GoogleCalendar:
 
         self.service = build('calendar', 'v3', credentials=self.creds)
 
+    def _load_token(self):
+        with open(self.tokenpath, 'rb') as token:
+            return pickle.load(token)
+
     def get_upcoming_events(self, verbose=False):
         now = datetime.datetime.utcnow().isoformat() + 'Z' # 'Z' indicates UTC time
-        print('Getting the upcoming 10 events')
         events_result = self.service.events().list(calendarId='primary', timeMin=now,
                                             maxResults=10, singleEvents=True,
                                             orderBy='startTime').execute()
@@ -46,14 +49,15 @@ class GoogleCalendar:
                 print('No upcoming events found.')
             for event in events:
                 start = event['start'].get('dateTime', event['start'].get('date'))
-                print(start, event['summary'])
+                print(f"{start} {event['summary']}")
         
         return events
 
 def main():
     c = GoogleCalendar() 
-    c.get_upcoming_events()
-    print(c)
+    upcoming_events = c.get_upcoming_events(verbose=True)
+    # breakpoint()
+    # print(upcoming_events)
 
 if __name__ == '__main__':
     main()
