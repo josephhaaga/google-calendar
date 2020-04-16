@@ -11,47 +11,49 @@ from google.auth.transport.requests import Request
 # If modifying these scopes, delete the file token.pickle.
 SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
 
-def main():
-    """Shows basic usage of the Google Calendar API.
-    Prints the start and name of the next 10 events on the user's calendar.
-    """
+class GoogleCalendar:
     home = str(Path.home())
     tokenpath = os.path.join(home, '.google', 'token.pickle')
     creds = None
-    # The file token.pickle stores the user's access and refresh tokens, and is
-    # created automatically when the authorization flow completes for the first
-    # time.
-    if os.path.exists(tokenpath):
-        with open(tokenpath, 'rb') as token:
-            creds = pickle.load(token)
-    # If there are no (valid) credentials available, let the user log in.
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file(
-                os.path.join(home, '.google', 'credentials.json'), SCOPES)
-            creds = flow.run_local_server(port=0)
-        # Save the credentials for the next run
-        with open(tokenpath, 'wb') as token:
-            pickle.dump(creds, token)
+    def __init__(self):
+        if os.path.exists(self.tokenpath):
+            with open(self.tokenpath, 'rb') as token:
+                self.creds = pickle.load(token)
+        # If there are no (valid) credentials available, let the user log in.
+        if not self.creds or not self.creds.valid:
+            if self.creds and self.creds.expired and self.creds.refresh_token:
+                self.creds.refresh(Request())
+            else:
+                flow = InstalledAppFlow.from_client_secrets_file(
+                    os.path.join(self.home, '.google', 'credentials.json'), SCOPES)
+                self.creds = flow.run_local_server(port=0)
+            # Save the credentials for the next run
+            with open(tokenpath, 'wb') as token:
+                pickle.dump(creds, token)
 
-    service = build('calendar', 'v3', credentials=creds)
+        self.service = build('calendar', 'v3', credentials=self.creds)
 
-    # Call the Calendar API
-    now = datetime.datetime.utcnow().isoformat() + 'Z' # 'Z' indicates UTC time
-    print('Getting the upcoming 10 events')
-    events_result = service.events().list(calendarId='primary', timeMin=now,
-                                        maxResults=10, singleEvents=True,
-                                        orderBy='startTime').execute()
-    events = events_result.get('items', [])
+    def get_upcoming_events(self, verbose=False):
+        now = datetime.datetime.utcnow().isoformat() + 'Z' # 'Z' indicates UTC time
+        print('Getting the upcoming 10 events')
+        events_result = self.service.events().list(calendarId='primary', timeMin=now,
+                                            maxResults=10, singleEvents=True,
+                                            orderBy='startTime').execute()
+        events = events_result.get('items', [])
+        
+        if verbose:
+            if not events:
+                print('No upcoming events found.')
+            for event in events:
+                start = event['start'].get('dateTime', event['start'].get('date'))
+                print(start, event['summary'])
+        
+        return events
 
-    if not events:
-        print('No upcoming events found.')
-    for event in events:
-        start = event['start'].get('dateTime', event['start'].get('date'))
-        print(start, event['summary'])
-
+def main():
+    c = GoogleCalendar() 
+    c.get_upcoming_events()
+    print(c)
 
 if __name__ == '__main__':
     main()
