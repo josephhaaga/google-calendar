@@ -28,14 +28,35 @@ class GoogleCalendar:
                     os.path.join(self.home, '.google', 'credentials.json'), SCOPES)
                 self.creds = flow.run_local_server(port=0)
             # Save the credentials for the next run
-            with open(tokenpath, 'wb') as token:
-                pickle.dump(creds, token)
+            with open(self.tokenpath, 'wb') as token:
+                pickle.dump(self.creds, token)
 
         self.service = build('calendar', 'v3', credentials=self.creds)
 
     def _load_token(self):
         with open(self.tokenpath, 'rb') as token:
             return pickle.load(token)
+
+    def get_todays_events(self, verbose=False):
+        now = datetime.datetime.now()
+        this_morning = datetime.datetime(now.year, now.month, now.day).isoformat() + '-04:00' # + 'Z'
+        midnight = datetime.datetime(now.year, now.month, now.day, 23, 59).isoformat() + '-04:00' #  'Z'
+        now = now.isoformat() + '-04:00' #  + 'Z'
+        print(f"this_morning: {this_morning}")
+        print(f"now: {now}")
+        print(f"midnight: {midnight}") 
+        events_result = self.service.events().list(calendarId='primary', timeMin=this_morning,
+                                            timeMax=midnight, singleEvents=True,
+                                            orderBy='startTime').execute()
+        return events_result.get('items', [])
+        
+
+    def get_current_events(self, verbose=False):
+        now = datetime.datetime.utcnow().isoformat() + 'Z'
+        todays_events = self.get_todays_events()
+        breakpoint()
+        events_occurring_now = filter(lambda event: event['start'].get('dateTime') < now and event['end'].get('dateTime') > now, todays_events)
+        return list(events_occurring_now)
 
     def get_upcoming_events(self, verbose=False):
         now = datetime.datetime.utcnow().isoformat() + 'Z' # 'Z' indicates UTC time
@@ -58,6 +79,7 @@ def main():
     upcoming_events = c.get_upcoming_events(verbose=True)
     # breakpoint()
     # print(upcoming_events)
+    print([f"{x['summary']}: {x['start']['dateTime']}" for x in c.get_todays_events()])
 
 if __name__ == '__main__':
     main()
