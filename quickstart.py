@@ -6,6 +6,7 @@ from pathlib import Path
 from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
+import pytz
 
 
 # If modifying these scopes, delete the file token.pickle.
@@ -37,49 +38,48 @@ class GoogleCalendar:
         with open(self.tokenpath, 'rb') as token:
             return pickle.load(token)
 
-    def get_todays_events(self, verbose=False):
+    def get_todays_events(self):
         now = datetime.datetime.now()
+        # TODO: fix '-04:00' hack; replace with real timezone logic
         this_morning = datetime.datetime(now.year, now.month, now.day).isoformat() + '-04:00' # + 'Z'
         midnight = datetime.datetime(now.year, now.month, now.day, 23, 59).isoformat() + '-04:00' #  'Z'
         now = now.isoformat() + '-04:00' #  + 'Z'
-        print(f"this_morning: {this_morning}")
-        print(f"now: {now}")
-        print(f"midnight: {midnight}") 
+        # TODO: consolidate duplicate events().list() logic
         events_result = self.service.events().list(calendarId='primary', timeMin=this_morning,
                                             timeMax=midnight, singleEvents=True,
                                             orderBy='startTime').execute()
         return events_result.get('items', [])
         
 
-    def get_current_events(self, verbose=False):
-        now = datetime.datetime.utcnow().isoformat() + 'Z'
+    def get_current_events(self):
+        now = datetime.datetime.now(pytz.utc)
         todays_events = self.get_todays_events()
-        breakpoint()
-        events_occurring_now = filter(lambda event: event['start'].get('dateTime') < now and event['end'].get('dateTime') > now, todays_events)
-        return list(events_occurring_now)
+        events_occurring_now = list(filter(lambda event: datetime.datetime.fromisoformat(event['start'].get('dateTime')) < now and datetime.datetime.fromisoformat(event['end'].get('dateTime')) > now, todays_events))
+        return events_occurring_now
 
-    def get_upcoming_events(self, verbose=False):
+    def get_upcoming_events(self):
         now = datetime.datetime.utcnow().isoformat() + 'Z' # 'Z' indicates UTC time
+        # TODO: consolidate duplicate events().list() logic
         events_result = self.service.events().list(calendarId='primary', timeMin=now,
                                             maxResults=10, singleEvents=True,
                                             orderBy='startTime').execute()
-        events = events_result.get('items', [])
-        
-        if verbose:
-            if not events:
-                print('No upcoming events found.')
-            for event in events:
-                start = event['start'].get('dateTime', event['start'].get('date'))
-                print(f"{start} {event['summary']}")
+        return events_result.get('items', [])
+
+    def print_events(self, events):
+        if not events:
+            print('No events found.')
+        for event in events:
+            start = event['start'].get('dateTime', event['start'].get('date'))
+            print(f"{start} {event['summary']}")
         
         return events
 
 def main():
     c = GoogleCalendar() 
-    upcoming_events = c.get_upcoming_events(verbose=True)
-    # breakpoint()
-    # print(upcoming_events)
-    print([f"{x['summary']}: {x['start']['dateTime']}" for x in c.get_todays_events()])
-
+    # upcoming_events = c.get_upcoming_events()
+    current_events = c.get_current_events()
+    c.print_events(current_events)
+    
+  
 if __name__ == '__main__':
     main()
